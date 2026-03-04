@@ -86,7 +86,7 @@ __global__ void compute_keys_comp_mode_sa(uint32_t mode, uint32_t* hash160, uint
 }
 
 // mode multiple x points
-__global__ void compute_keys_comp_mode_mx(uint32_t mode, uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint64_t* keys,
+__global__ void compute_keys_comp_mode_mx(uint32_t mode, uint8_t* bloomLookUp, unsigned long long BLOOM_BITS, uint8_t BLOOM_HASHES, uint64_t* keys,
 	uint32_t maxFound, uint32_t* found)
 {
 
