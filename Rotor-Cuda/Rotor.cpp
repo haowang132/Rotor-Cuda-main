@@ -75,7 +75,7 @@ Rotor::Rotor(const std::string& inputFile, int compMode, int searchMode, int coi
 
 	uint8_t* buf = (uint8_t*)malloc(K_LENGTH);;
 
-	bloom = new Bloom(2 * N, 0.000001);
+	bloom = new Bloom(2 * N, 0.00001);
 
 	uint64_t percent = (N - 1) / 100;
 	uint64_t i = 0;
@@ -87,7 +87,7 @@ Rotor::Rotor(const std::string& inputFile, int compMode, int searchMode, int coi
 			bloom->add(buf, K_LENGTH);
 			memcpy(DATA + (i * K_LENGTH), buf, K_LENGTH);
 			if ((percent != 0) && i % percent == 0) {
-				printf("\r  Loading      : %llu %%", (i / percent));
+				printf("\r  Loading      : %lu %%", (i / percent));
 				fflush(stdout);
 			}
 		}
@@ -574,7 +574,7 @@ void Rotor::FindKeyCPU(TH_PARAM * ph)
 	if (rKey > 0) {
 		if (rKeyCount2 == 0) {
 			if (thId == 0) {
-				printf("  Base Key     : Randomly changes %d Private keys every %llu.000.000.000 on the counter\n\n", nbCPUThread, rKey);
+				printf("  Base Key     : Randomly changes %d Private keys every %lu.000.000.000 on the counter\n\n", nbCPUThread, rKey);
 			}
 		}
 	}
@@ -837,11 +837,31 @@ void Rotor::getGPUStartingKeys(Int & tRangeStart, Int & tRangeEnd, int groupSize
 {
 	if (rKey > 0) {
 		if (rKeyCount2 == 0) {
-			printf("  Base Key     : Randomly changes %d start Private keys every %llu.000.000.000 on the counter\n\n", nbThread, rKey);
+			printf("  Base Key     : Randomly changes %d start Private keys every %lu.000.000.000 on the counter\n\n", nbThread, rKey);
 		}
-		
+
+		// Define the custom range for -r mode
+		// Int customStart, customEnd, rangeSize;
+		// customStart.SetBase16("100000000000000000000000000");
+		// customEnd.SetBase16("fffffffffffffffffffffffffff");
+		// rangeSize.Set(&customEnd);
+		// rangeSize.Sub(&customStart);
+
+		// for (int i = 0; i < nbThread; i++) {
+		// 	// Generate random number within the custom range, adjusted for group offset
+		// 	Int adjustedRangeSize(rangeSize);
+		// 	adjustedRangeSize.Sub((uint64_t)(groupSize / 2));	// Reserve space for group offset
+
+		// 	keys[i].Rand(&adjustedRangeSize);
+		// 	keys[i].Add(&customStart);
+		// 	rhex = keys[i];
+		// 	Int k(keys + i);
+		// 	k.Add((uint64_t)(groupSize / 2));	// Starting key is at the middle of the group
+		// 	p[i] = secp->ComputePublicKey(&k);
+
+		// }
 		for (int i = 0; i < nbThread; i++) {
-			keys[i].Rand(256);
+			keys[i].Rand(108);
 			rhex = keys[i];
 			Int k(keys + i);
 			k.Add((uint64_t)(groupSize / 2));	// Starting key is at the middle of the group
@@ -872,32 +892,32 @@ void Rotor::getGPUStartingKeys(Int & tRangeStart, Int & tRangeEnd, int groupSize
 
 			keys[i].Set(&tRangeStart2);
 			if (i == 0) {
-				printf("  Thread 00000: %064s ->", keys[i].GetBase16().c_str());
+				printf("  Thread 00000: %64s ->", keys[i].GetBase16().c_str());
 			}
 			Int dobb;
 			dobb.Set(&tRangeStart2);
 			dobb.Add(&tRangeDiff);
 			if (i == 0) {
-				printf(" %064s \n", dobb.GetBase16().c_str());
+				printf(" %64s \n", dobb.GetBase16().c_str());
 			}
 			if (i == 1) {
-				printf("  Thread 00001: %064s -> %064s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread 00001: %64s -> %64s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 			}
 			if (i == 2) {
-				printf("  Thread 00002: %064s -> %064s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread 00002: %64s -> %64s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 			}
 			if (i == 3) {
-				printf("  Thread 00003: %064s -> %064s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread 00003: %64s -> %64s \n", tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 				printf("          ... : \n");
 			}
 			if (i == nbThread - 2) {
-				printf("  Thread %d: %064s -> %064s \n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread %d: %64s -> %64s \n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 			}
 			if (i == nbThread - 1) {
-				printf("  Thread %d: %064s -> %064s \n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread %d: %64s -> %64s \n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 			}
 			if (i == nbThread) {
-				printf("  Thread %d: %064s -> %064s \n\n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
+				printf("  Thread %d: %64s -> %64s \n\n", i, tRangeStart2.GetBase16().c_str(), dobb.GetBase16().c_str());
 			}
 
 			tRangeStart2.Add(&tRangeDiff);
@@ -1272,8 +1292,8 @@ void Rotor::Search(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
 				
 				if (avgGpuKeyRate > 1000000000) {
 
-					memset(timeStr, '\0', 256);
-					printf("\r  [%s] [R: %llu] [%s] [F: %d] [CPU+GPU: %.2f Gk/s] [GPU: %.2f Gk/s] [T: %s]    ",
+					memset(timeStr, '\0', 24);
+					printf("\r  [%s] [R: %lu] [%s] [F: %d] [CPU+GPU: %.2f Gk/s] [GPU: %.2f Gk/s] [T: %s]    ",
 						toTimeStr(t1, timeStr),
 						rKeyCount,
 						rhex.GetBase16().c_str(),
@@ -1283,8 +1303,8 @@ void Rotor::Search(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
 						formatThousands(count).c_str());
 				}
 				else {
-					memset(timeStr, '\0', 256);
-					printf("\r  [%s] [R: %llu] [%s] [F: %d] [CPU+GPU: %.2f Mk/s] [GPU: %.2f Mk/s] [T: %s]    ",
+					memset(timeStr, '\0', 24);
+					printf("\r  [%s] [R: %lu] [%s] [F: %d] [CPU+GPU: %.2f Mk/s] [GPU: %.2f Mk/s] [T: %s]    ",
 						toTimeStr(t1, timeStr),
 						rKeyCount,
 						rhex.GetBase16().c_str(),
@@ -1299,8 +1319,8 @@ void Rotor::Search(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
 			
 			if (avgGpuKeyRate > 1000000000) {
 				if (isAlive(params)) {
-					memset(timeStr, '\0', 256);
-					printf("\r  [%s] [CPU+GPU: %.2f Gk/s] [GPU: %.2f Gk/s] [C: %lf %%] [R: %llu] [T: %s (%d bit)] [F: %d]   ",
+					memset(timeStr, '\0', 24);
+					printf("\r  [%s] [CPU+GPU: %.2f Gk/s] [GPU: %.2f Gk/s] [C: %lf %%] [R: %lu] [T: %s (%d bit)] [F: %d]   ",
 						toTimeStr(t1, timeStr),
 						avgKeyRate / 1000000000.0,
 						avgGpuKeyRate / 1000000000.0,
@@ -1313,8 +1333,8 @@ void Rotor::Search(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
 			}
 			else {
 				if (isAlive(params)) {
-					memset(timeStr, '\0', 256);
-					printf("\r  [%s] [CPU+GPU: %.2f Mk/s] [GPU: %.2f Mk/s] [C: %lf %%] [R: %llu] [T: %s (%d bit)] [F: %d]   ",
+					memset(timeStr, '\0', 24);
+					printf("\r  [%s] [CPU+GPU: %.2f Mk/s] [GPU: %.2f Mk/s] [C: %lf %%] [R: %lu] [T: %s (%d bit)] [F: %d]   ",
 						toTimeStr(t1, timeStr),
 						avgKeyRate / 1000000.0,
 						avgGpuKeyRate / 1000000.0,
@@ -1441,7 +1461,7 @@ std::string Rotor::formatThousands(uint64_t x)
 {
 	char buf[32] = "";
 
-	sprintf(buf, "%llu", x);
+	sprintf(buf, "%lu", x);
 
 	std::string s(buf);
 
