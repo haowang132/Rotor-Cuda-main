@@ -26,11 +26,11 @@ __device__ uint64_t* Gy = NULL;
 
 // ---------------------------------------------------------------------------------------
 
-__device__ int Test_Bit_Set_Bit(const uint8_t* buf, uint32_t bit)
+__device__ int Test_Bit_Set_Bit(const uint8_t* buf, uint64_t bit)
 {
-	uint32_t byte = bit >> 3;
+	uint64_t byte = bit >> 3;
 	uint8_t c = buf[byte];        // expensive memory access
-	uint8_t mask = 1 << (bit % 8);
+	uint8_t mask = (uint8_t)(1u << (bit & 7ULL));
 
 	if (c & mask) {
 		return 1;
@@ -78,29 +78,56 @@ __device__ uint32_t MurMurHash2(const void* key, int len, uint32_t seed)
 
 // ---------------------------------------------------------------------------------------
 
-__device__ int BloomCheck(const uint32_t* hash, const uint8_t* inputBloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t K_LENGTH)
+// __device__ int BloomCheck(const uint32_t* hash, const uint8_t* inputBloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t K_LENGTH)
+// {
+// 	int add = 0;
+// 	uint8_t hits = 0;
+// 	uint32_t a = MurMurHash2((uint8_t*)hash, K_LENGTH, 0x9747b28c);
+// 	uint32_t b = MurMurHash2((uint8_t*)hash, K_LENGTH, a);
+// 	uint64_t x;
+// 	uint8_t i;
+// 	for (i = 0; i < BLOOM_HASHES; i++) {
+// 		x = ((uint64_t)a + (uint64_t)b * i) % BLOOM_BITS;
+// 		if (Test_Bit_Set_Bit(inputBloomLookUp, x)) {
+// 			hits++;
+// 		}
+// 		else if (!add) {
+// 			return 0;
+// 		}
+// 	}
+// 	if (hits == BLOOM_HASHES) {
+// 		return 1;
+// 	}
+// 	return 0;
+// }
+__device__ int BloomCheck(
+    const uint32_t* hash,
+    const uint8_t* inputBloomLookUp,
+    uint64_t BLOOM_BITS,
+    uint8_t BLOOM_HASHES,
+    uint32_t K_LENGTH)
 {
-	int add = 0;
-	uint8_t hits = 0;
-	uint32_t a = MurMurHash2((uint8_t*)hash, K_LENGTH, 0x9747b28c);
-	uint32_t b = MurMurHash2((uint8_t*)hash, K_LENGTH, a);
-	uint32_t x;
-	uint8_t i;
-	for (i = 0; i < BLOOM_HASHES; i++) {
-		x = (a + b * i) % BLOOM_BITS;
-		if (Test_Bit_Set_Bit(inputBloomLookUp, x)) {
-			hits++;
-		}
-		else if (!add) {
-			return 0;
-		}
-	}
-	if (hits == BLOOM_HASHES) {
-		return 1;
-	}
-	return 0;
-}
+    uint8_t hits = 0;
 
+    uint32_t a = MurMurHash2((uint8_t*)hash, K_LENGTH, 0x9747b28c);
+    uint32_t b = MurMurHash2((uint8_t*)hash, K_LENGTH, a);
+
+    for (uint8_t i = 0; i < BLOOM_HASHES; i++) {
+
+        // 关键：保持 32-bit 环行为
+        uint32_t x32 = a + b * i;
+
+        // 仅索引扩展到 64-bit
+        uint64_t x = ((uint64_t)x32) % BLOOM_BITS;
+
+        if (!Test_Bit_Set_Bit(inputBloomLookUp, x))
+            return 0;
+
+        hits++;
+    }
+
+    return (hits == BLOOM_HASHES);
+}
 // ---------------------------------------------------------------------------------------
 
 __device__ __noinline__ void CheckPointSEARCH_MODE_MA(uint32_t* _h, int32_t incr, int32_t mode,
@@ -236,7 +263,7 @@ __device__ __noinline__ void CheckPointSEARCH_MODE_SX(uint32_t* _h, int32_t incr
 #define CHECK_POINT_SEARCH_MODE_MA(_h,incr,mode)  CheckPointSEARCH_MODE_MA(_h,incr,mode,bloomLookUp,BLOOM_BITS,BLOOM_HASHES,maxFound,out)
 
 __device__ __noinline__ void CheckHashCompSEARCH_MODE_MA(uint64_t* px, uint8_t isOdd, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	uint32_t h[5];
 	_GetHash160Comp(px, isOdd, (uint8_t*)h);
@@ -257,7 +284,7 @@ __device__ __noinline__ void CheckHashCompSEARCH_MODE_SA(uint64_t* px, uint8_t i
 // -----------------------------------------------------------------------------------------
 
 __device__ __noinline__ void CheckHashUnCompSEARCH_MODE_MA(uint64_t* px, uint64_t* py, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	uint32_t h[5];
 	_GetHash160(px, py, (uint8_t*)h);
@@ -277,7 +304,7 @@ __device__ __noinline__ void CheckHashUnCompSEARCH_MODE_SA(uint64_t* px, uint64_
 // -----------------------------------------------------------------------------------------
 
 __device__ __noinline__ void CheckHashSEARCH_MODE_MA(uint32_t mode, uint64_t* px, uint64_t* py, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	switch (mode) {
 	case SEARCH_COMPRESSED:
@@ -298,7 +325,7 @@ __device__ __noinline__ void CheckHashSEARCH_MODE_MA(uint32_t mode, uint64_t* px
 #define CHECK_POINT_SEARCH_MODE_MX(_h,incr,mode)  CheckPointSEARCH_MODE_MX(_h,incr,mode,bloomLookUp,BLOOM_BITS,BLOOM_HASHES,maxFound,out)
 
 __device__ __noinline__ void CheckPubCompSEARCH_MODE_MX(uint64_t* px, uint8_t isOdd, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	uint32_t h[8];
 	uint32_t* x32 = (uint32_t*)(px);
@@ -340,7 +367,7 @@ __device__ __noinline__ void CheckPubCompSEARCH_MODE_SX(uint64_t* px, uint8_t is
 // ---------------------------------------------------------------------------------------
 
 __device__ __noinline__ void CheckPubSEARCH_MODE_MX(uint32_t mode, uint64_t* px, uint64_t* py, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 
 	if (mode == SEARCH_COMPRESSED) {
@@ -370,7 +397,7 @@ __device__ __noinline__ void CheckPubSEARCH_MODE_SX(uint32_t mode, uint64_t* px,
 #define CHECK_HASH_SEARCH_MODE_MA(incr) CheckHashSEARCH_MODE_MA(mode, px, py, incr, bloomLookUp, BLOOM_BITS, BLOOM_HASHES, maxFound, out)
 
 __device__ void ComputeKeysSEARCH_MODE_MA(uint32_t mode, uint64_t* startx, uint64_t* starty,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 
 	uint64_t dx[GRP_SIZE / 2 + 1][4];
@@ -636,7 +663,7 @@ __device__ void ComputeKeysSEARCH_MODE_SA(uint32_t mode, uint64_t* startx, uint6
 #define CHECK_PUB_SEARCH_MODE_MX(incr) CheckPubSEARCH_MODE_MX(mode, px, py, incr, bloomLookUp, BLOOM_BITS, BLOOM_HASHES, maxFound, out)
 
 __device__ void ComputeKeysSEARCH_MODE_MX(uint32_t mode, uint64_t* startx, uint64_t* starty,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 
 	uint64_t dx[GRP_SIZE / 2 + 1][4];
@@ -904,7 +931,7 @@ __device__ __noinline__ void CheckPointSEARCH_ETH_MODE_MA(uint32_t* _h, int32_t 
 #define CHECK_POINT_SEARCH_ETH_MODE_MA(_h,incr)  CheckPointSEARCH_ETH_MODE_MA(_h,incr,bloomLookUp,BLOOM_BITS,BLOOM_HASHES,maxFound,out)
 
 __device__ __noinline__ void CheckHashCompSEARCH_ETH_MODE_MA(uint64_t* px, uint64_t* py, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	uint32_t h[5];
 	_GetHashKeccak160(px, py, h);
@@ -913,7 +940,7 @@ __device__ __noinline__ void CheckHashCompSEARCH_ETH_MODE_MA(uint64_t* px, uint6
 
 
 __device__ __noinline__ void CheckHashSEARCH_ETH_MODE_MA(uint64_t* px, uint64_t* py, int32_t incr,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 	CheckHashCompSEARCH_ETH_MODE_MA(px, py, incr, bloomLookUp, BLOOM_BITS, BLOOM_HASHES, maxFound, out);
 
@@ -922,7 +949,7 @@ __device__ __noinline__ void CheckHashSEARCH_ETH_MODE_MA(uint64_t* px, uint64_t*
 #define CHECK_HASH_SEARCH_ETH_MODE_MA(incr) CheckHashSEARCH_ETH_MODE_MA(px, py, incr, bloomLookUp, BLOOM_BITS, BLOOM_HASHES, maxFound, out)
 
 __device__ void ComputeKeysSEARCH_ETH_MODE_MA(uint64_t* startx, uint64_t* starty,
-	uint8_t* bloomLookUp, int BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
+	uint8_t* bloomLookUp, uint64_t BLOOM_BITS, uint8_t BLOOM_HASHES, uint32_t maxFound, uint32_t* out)
 {
 
 	uint64_t dx[GRP_SIZE / 2 + 1][4];
