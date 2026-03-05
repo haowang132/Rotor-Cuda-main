@@ -1,3 +1,6 @@
+先测试：
+私钥：000000000000000000000000000000000000d83e1a8cb7946ce747254be59f98
+公钥：026b564d97ba2957c1f2b637b4724d88b2224bdac61903036e969ccca186395bc1
 # Rotor-Cuda 
 
 This is a modified version of KeyHunt v1.7 by [kanhavishva](https://github.com/kanhavishva/KeyHunt-Cuda).
